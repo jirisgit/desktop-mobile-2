@@ -243,10 +243,11 @@ button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; 
   #rail:active{ cursor:grabbing; }
   .tick{
     position:absolute; top:50%; transform:translate(-50%,-50%);
-    font-size:9px; letter-spacing:.12em; text-transform:uppercase;
+    font-size:9px; letter-spacing:.1em; text-transform:uppercase;
     color:var(--dim);
     pointer-events:none;
-    transition:color .15s;
+    white-space:nowrap;
+    transition:color .15s, opacity .15s;
   }
   .tick.active{ color:var(--accent); }
   #thumb{
@@ -262,6 +263,29 @@ button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; 
     box-shadow:0 0 14px color-mix(in srgb, var(--accent) 40%, transparent);
   }
 
+  /* hold-progress bar: fills over the long-press duration so the
+     "this is about to become a resize handle" affordance is felt,
+     not just discovered by accident */
+  #holdbar{
+    position:absolute; left:0; bottom:0; height:2px; width:0;
+    background:var(--accent); opacity:.85; pointer-events:none;
+  }
+  #rail.charging #holdbar{ width:100%; transition:width 380ms linear; }
+  #rail:not(.charging) #holdbar{ width:0; transition:width 100ms ease-out; }
+
+  /* resize mode: rail becomes a height handle, thumb/ticks recede,
+     a live value badge floats in the middle */
+  #rail.resizing{ background:color-mix(in srgb, var(--accent) 12%, var(--bg)); }
+  #rail.resizing #thumb, #rail.resizing .tick{ opacity:.2; }
+  #resizeBadge{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    font-size:10px; letter-spacing:.08em; font-weight:600;
+    color:var(--accent-ink); background:var(--accent);
+    padding:3px 9px; border-radius:99px;
+    opacity:0; pointer-events:none; transition:opacity .1s;
+  }
+  #rail.resizing #resizeBadge{ opacity:1; }
+
   /* ---- horizontal column scroller ---- */
   #scroller{
     display:flex;
@@ -270,14 +294,12 @@ button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; 
     scrollbar-width:none;
   }
   #scroller::-webkit-scrollbar{ display:none; }
-  #panel.snap #scroller{ scroll-snap-type:x proximity; }
   #panel.direct-swipe #scroller{ touch-action:pan-x pan-y; } /* experiment flag */
 
   .cat{
     flex:none; width:var(--colW);
     display:flex; flex-direction:column;
     border-bottom:0; border-right:1px solid var(--line);
-    scroll-snap-align:start;
     min-height:0;
   }
   .cat-head{ flex:none; padding:10px 14px 6px; pointer-events:none; }
@@ -307,6 +329,8 @@ button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; 
   <div id="panel">
     <div id="rail" aria-hidden="true">
       <div id="thumb"></div>
+      <div id="holdbar"></div>
+      <span id="resizeBadge"></span>
     </div>
     <div id="scroller"><!-- categories injected here --></div>
   </div>
@@ -331,7 +355,7 @@ const P = {
 };
 
 /* ---------- lab flags / layout vars ---------- */
-const LAB = { snap:true, directSwipe:false, dockH:42, colW:280, railH:34 };
+const LAB = { magnetSnap:false, directSwipe:false, dockH:42, colW:280, railH:34 };
 
 const $  = s => document.querySelector(s);
 const panel    = $('#panel');
@@ -354,8 +378,10 @@ const fmt = {
 const CATS = [
   { id:'lab', name:'Lab', controls:[
     { t:'note', text:'Meta-controls for the system itself. Rotate the device or resize the window to switch layouts.' },
-    { t:'toggle', name:'Snap to category', get:()=>LAB.snap, set:v=>{ LAB.snap=v; panel.classList.toggle('snap',v); } },
+    { t:'toggle', name:'Magnetic snap', get:()=>LAB.magnetSnap, set:v=>{ LAB.magnetSnap=v; } },
+    { t:'note', text:'Off = the dock stops wherever you release it. On = it settles onto the nearest category with a small spring — slight overshoot wiggle, a soft click on arrival.' },
     { t:'toggle', name:'Direct swipe (danger)', get:()=>LAB.directSwipe, set:v=>{ LAB.directSwipe=v; panel.classList.toggle('direct-swipe',v); } },
+    { t:'note', text:'Long-press the rail without sliding to grab it like a resize handle — drag up/down to resize the dock.' },
     { t:'slider', name:'Dock height', min:28, max:64, step:1, f:fmt.vh,
       get:()=>LAB.dockH, set:v=>{ LAB.dockH=v; root.style.setProperty('--dockH', v+'svh'); } },
     { t:'slider', name:'Column width', min:220, max:380, step:2, f:fmt.px,
@@ -466,7 +492,6 @@ for(const cat of CATS){
   sec.append(head, body);
   scroller.appendChild(sec);
 }
-panel.classList.toggle('snap', LAB.snap);
 
 function randomize(){
   P.freqA=1+Math.floor(Math.random()*9);
@@ -493,14 +518,20 @@ applyMode();
 
 /* ==============================================================
    GRAB RAIL
-   A proportional scrubber. Mapping is the same as a native
-   scrollbar: thumbWidth = rail * visible/total, and pointer x
-   (minus half the thumb) maps linearly onto scrollLeft. Tick
-   labels are placed where the thumb's CENTER sits when that
-   category is docked at the left edge — so tapping a label
-   lands exactly on its category.
+   The THUMB stays a true scrollbar: its width and position mirror
+   the visible fraction of scrollLeft/scrollWidth, same math a
+   native scrollbar uses. TICKS are a different thing — a fixed
+   category index, like tab labels — so they're spaced evenly
+   across the rail by position in the list, not by where their
+   column happens to fall in scroll-space. Proportional placement
+   looked reasonable with two categories but collapsed the later
+   ones together once total content only slightly exceeds one
+   viewport (their scroll offsets all clamp near scrollWidth-max,
+   so they piled up at the right edge). Even spacing has no such
+   failure mode regardless of column count or width.
    ============================================================== */
 let thumbW = 44, ticks = [];
+const TICK_INSET = 26; // px — half a label's width, keeps end ticks off the rail edge
 
 function layoutRail(){
   if (!mq.matches) return;
@@ -511,22 +542,31 @@ function layoutRail(){
   thumbW = Math.max(44, railW * vis / total);
   thumb.style.width = thumbW + 'px';
 
-  // (re)build ticks
   if (ticks.length !== CATS.length){
     ticks.forEach(t=>t.remove()); ticks=[];
     for(const cat of CATS){
       const t=document.createElement('span');
-      t.className='tick'; t.textContent=cat.name;
+      t.className='tick'; t.textContent=cat.name; t.dataset.i=ticks.length;
+      t.addEventListener('pointerdown', e=>e.stopPropagation()); // don't start a rail-drag
+      t.addEventListener('click', ()=>jumpTo(+t.dataset.i));
+      t.style.pointerEvents='auto'; t.style.cursor='pointer';
       rail.appendChild(t); ticks.push(t);
     }
   }
-  const secs=[...scroller.children];
-  secs.forEach((sec,i)=>{
-    const left=Math.min(sec.offsetLeft, maxScroll);
-    const x = thumbW/2 + (left/maxScroll) * (railW - thumbW);
-    ticks[i].style.left = x + 'px';
-  });
+
+  const n = ticks.length;
+  const usable = Math.max(0, railW - TICK_INSET*2);
+  const step = n>1 ? usable/(n-1) : 0;
+  ticks.forEach((t,i)=>{ t.style.left = (TICK_INSET + step*i) + 'px'; });
   syncThumb();
+}
+
+function jumpTo(index){
+  const sec = scroller.children[index]; if (!sec) return;
+  const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+  const target = Math.min(sec.offsetLeft, Math.max(0,maxScroll));
+  if (LAB.magnetSnap) springTo(target, 0, index);
+  else { scroller.scrollLeft = target; syncThumb(); }
 }
 
 let activeCat = -1;
@@ -536,34 +576,134 @@ function syncThumb(){
   const x = (scroller.scrollLeft / maxScroll) * (railW - thumbW);
   thumb.style.transform = `translateX(${x}px)`;
 
-  // highlight the category currently nearest the left edge
-  const secs=[...scroller.children];
-  let best=0, bestD=1e9;
-  secs.forEach((sec,i)=>{
-    const d=Math.abs(sec.offsetLeft - scroller.scrollLeft);
-    if (d<bestD){ bestD=d; best=i; }
-  });
-  if (best!==activeCat){
-    activeCat=best;
-    ticks.forEach((t,i)=>t.classList.toggle('active', i===best));
-    if (navigator.vibrate) navigator.vibrate(4);   // tiny detent tick
+  const {index} = nearestTargetFrom(scroller.scrollLeft);
+  if (index!==activeCat){
+    activeCat=index;
+    ticks.forEach((t,i)=>t.classList.toggle('active', i===index));
   }
 }
 scroller.addEventListener('scroll', ()=>requestAnimationFrame(syncThumb), {passive:true});
 
-/* scrub: pointer down anywhere on the rail jumps the thumb there,
-   then dragging follows the finger 1:1 in rail space */
+/* -------------------- nearest-category + spring snap -------------------- */
+function nearestTargetFrom(pos){
+  const secs=[...scroller.children];
+  const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+  let bestLeft=0, bestD=Infinity, bestI=0;
+  secs.forEach((sec,i)=>{
+    const left=Math.min(sec.offsetLeft, Math.max(0,maxScroll));
+    const d=Math.abs(left-pos);
+    if(d<bestD){ bestD=d; bestLeft=left; bestI=i; }
+  });
+  return {left:bestLeft, index:bestI};
+}
+
+let springHandle=null, lastSettledIndex=-1;
+function cancelSpring(){ if(springHandle) cancelAnimationFrame(springHandle); springHandle=null; }
+
+/* Two attracting magnets: a lightly under-damped spring (critical
+   damping at k=180 would be c≈27) so it eases in, slightly
+   overshoots the target, and settles with one small wiggle —
+   then a soft haptic click marks arrival. */
+function springTo(target, v0=0, index=-1){
+  cancelSpring();
+  let pos=scroller.scrollLeft, vel=v0;
+  const k=170, c=15.5;
+  let lastT=performance.now();
+  function step(now){
+    const dt=Math.min(0.032,(now-lastT)/1000); lastT=now;
+    const F = -k*(pos-target) - c*vel;
+    vel += F*dt; pos += vel*dt;
+    scroller.scrollLeft = pos;
+    syncThumb();
+    if (Math.abs(pos-target)>0.4 || Math.abs(vel)>4){
+      springHandle=requestAnimationFrame(step);
+    } else {
+      scroller.scrollLeft = target; syncThumb(); springHandle=null;
+      if (index!==lastSettledIndex){
+        lastSettledIndex=index;
+        if (navigator.vibrate) navigator.vibrate(14);
+      }
+    }
+  }
+  springHandle=requestAnimationFrame(step);
+}
+function magnetSnapFrom(vel){
+  const projected = scroller.scrollLeft + vel*0.12;   // fling toward the next card
+  const {left,index} = nearestTargetFrom(projected);
+  springTo(left, vel, index);
+}
+
+/* -------------------- rail: scrub vs. long-press-to-resize -------------------- */
+const LONG_PRESS_MS = 380, MOVE_CANCEL_PX = 6, DOCKH_MIN = 26, DOCKH_MAX = 64;
+let railMode = null;              // 'pending' | 'scrub' | 'resize'
+let startX=0, startY=0, startDockH=42;
+let longPressTimer=null, dragSamples=[];
+
 rail.addEventListener('pointerdown', e=>{
   rail.setPointerCapture(e.pointerId);
-  rail.classList.add('scrubbing');
-  scrub(e);
+  cancelSpring();
+  startX=e.clientX; startY=e.clientY; startDockH=LAB.dockH;
+  railMode='pending';
+  dragSamples=[{t:performance.now(), x:scroller.scrollLeft}];
+  rail.classList.add('charging');
+  longPressTimer=setTimeout(()=>{ if(railMode==='pending') enterResize(); }, LONG_PRESS_MS);
 });
+
 rail.addEventListener('pointermove', e=>{
-  if (rail.classList.contains('scrubbing')) scrub(e);
+  if (railMode==='pending'){
+    const dx=Math.abs(e.clientX-startX), dy=Math.abs(e.clientY-startY);
+    if (dx>MOVE_CANCEL_PX){
+      clearTimeout(longPressTimer); rail.classList.remove('charging');
+      railMode='scrub'; rail.classList.add('scrubbing');
+    } else if (dy>MOVE_CANCEL_PX){
+      clearTimeout(longPressTimer); rail.classList.remove('charging');
+      railMode='cancelled';
+    }
+  }
+  if (railMode==='scrub') scrub(e);
+  if (railMode==='resize') doResize(e);
 });
-const endScrub = ()=>rail.classList.remove('scrubbing');
-rail.addEventListener('pointerup', endScrub);
-rail.addEventListener('pointercancel', endScrub);
+
+function enterResize(){
+  railMode='resize';
+  rail.classList.remove('charging');
+  rail.classList.add('resizing');
+  $('#resizeBadge').textContent = Math.round(LAB.dockH)+'svh';
+  if (navigator.vibrate) navigator.vibrate(16);
+}
+function doResize(e){
+  const dy = startY - e.clientY;                       // dragging up = taller dock
+  let vh = startDockH + dy/innerHeight*100;
+  vh = Math.min(DOCKH_MAX, Math.max(DOCKH_MIN, vh));
+  LAB.dockH = vh;
+  root.style.setProperty('--dockH', vh+'svh');
+  $('#resizeBadge').textContent = Math.round(vh)+'svh';
+  refreshers.forEach(f=>f());          // keep the Lab "Dock height" slider honest
+  layoutRail();
+}
+function endRailGesture(){
+  clearTimeout(longPressTimer);
+  rail.classList.remove('charging');
+  if (railMode==='scrub'){
+    rail.classList.remove('scrubbing');
+    if (LAB.magnetSnap){
+      let vel=0;
+      if (dragSamples.length>=2){
+        const a=dragSamples[0], b=dragSamples[dragSamples.length-1];
+        const dt=(b.t-a.t)/1000;
+        if (dt>0.008) vel=(b.x-a.x)/dt;
+      }
+      magnetSnapFrom(vel);
+    }
+  }
+  if (railMode==='resize'){
+    rail.classList.remove('resizing');
+    if (navigator.vibrate) navigator.vibrate(10);
+  }
+  railMode=null; dragSamples=[];
+}
+rail.addEventListener('pointerup', endRailGesture);
+rail.addEventListener('pointercancel', endRailGesture);
 
 function scrub(e){
   const r = rail.getBoundingClientRect();
@@ -571,7 +711,25 @@ function scrub(e){
   const maxScroll = scroller.scrollWidth - scroller.clientWidth;
   const t = (e.clientX - r.left - thumbW/2) / Math.max(1, railW - thumbW);
   scroller.scrollLeft = Math.min(1, Math.max(0, t)) * maxScroll;
+  dragSamples.push({t:performance.now(), x:scroller.scrollLeft});
+  if (dragSamples.length>6) dragSamples.shift();
+  syncThumb();
 }
+
+/* direct-swipe experiment: native touch scrolling has its own
+   momentum, so we only catch it once it's actually settled —
+   'scrollend' where supported, a debounce fallback otherwise. */
+let scrollEndTimer=null;
+function onNativeScrollSettled(){
+  if (!LAB.magnetSnap || !panel.classList.contains('direct-swipe')) return;
+  const {left,index} = nearestTargetFrom(scroller.scrollLeft);
+  springTo(left, 0, index);
+}
+if ('onscrollend' in window) scroller.addEventListener('scrollend', onNativeScrollSettled);
+else scroller.addEventListener('scroll', ()=>{
+  clearTimeout(scrollEndTimer);
+  scrollEndTimer=setTimeout(onNativeScrollSettled, 140);
+}, {passive:true});
 
 new ResizeObserver(()=>layoutRail()).observe(panel);
 addEventListener('resize', layoutRail);
