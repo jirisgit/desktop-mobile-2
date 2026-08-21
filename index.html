@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="A responsive UI playground: a canvas workspace plus a deep settings menu, tuned for desktop and mobile from one codebase.">
+<meta name="theme-color" content="#0b0c0e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<title>Canvas UI Playground</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/layout.css">
+<link rel="stylesheet" href="styles/controls.css">
+<link rel="stylesheet" href="styles/sheet.css">
+</head>
+<body>
+
+<!-- ─────────── icon sprite ─────────── -->
+<svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-frame" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16M8 4v16M16 4v16"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-shape" viewBox="0 0 24 24"><circle cx="8" cy="8" r="5"/><path d="M15 12h6.5L18.25 21z"/></symbol>
+  <symbol id="i-type" viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></symbol>
+  <symbol id="i-fx" viewBox="0 0 24 24"><path d="m12 3 1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4zM18 15l.9 2.1 2.1.9-2.1.9L18 21l-.9-2.1-2.1-.9 2.1-.9z"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8M21 4v4h-4"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16M3 20v-4h4"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3 9"/><path d="M3 4v5h5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-kbd" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M8 14h8"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-collapse" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10m4 0h2M4 17h4m4 0h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"/></symbol>
+</svg>
+
+<!-- ─────────── device-preview shell ─────────── -->
+<div class="stagehand" id="stagehand" data-preview="off">
+
+  <div class="devbar" id="devbar" role="toolbar" aria-label="Preview device">
+    <div class="devbar__group" role="radiogroup" aria-label="Preview size">
+      <button class="devbar__btn is-active" data-device="off" role="radio" aria-checked="true">Responsive</button>
+      <button class="devbar__btn" data-device="phone" role="radio" aria-checked="false">Phone</button>
+      <button class="devbar__btn" data-device="phone-lg" role="radio" aria-checked="false">Phone L</button>
+      <button class="devbar__btn" data-device="tablet" role="radio" aria-checked="false">Tablet</button>
+    </div>
+    <button class="devbar__icon" id="devRotate" title="Rotate device" aria-label="Rotate device"><svg class="ico"><use href="#i-rotate"/></svg></button>
+    <span class="devbar__size" id="devSize">auto</span>
+  </div>
+
+  <div class="device" id="device">
+    <!-- ─────────── the app ─────────── -->
+    <div class="app" id="app" data-layout="desktop">
+
+      <header class="topbar">
+        <div class="topbar__lead">
+          <span class="brand" aria-hidden="true"></span>
+          <h1 class="topbar__title">Canvas Playground</h1>
+          <button class="btn btn--ghost btn--sm" id="presetBtn" popovertarget="presetPop" aria-label="Presets">
+            <svg class="ico"><use href="#i-sliders"/></svg><span class="t-desk" id="presetName">Custom</span>
+          </button>
+        </div>
+
+        <div class="topbar__mid t-desk">
+          <div class="seg seg--sm" id="aspectTop" role="radiogroup" aria-label="Aspect ratio"></div>
+        </div>
+
+        <div class="topbar__trail">
+          <div class="zoombox t-desk">
+            <button class="btn btn--icon btn--sm" id="zoomOut" aria-label="Zoom out"><svg class="ico"><use href="#i-minus"/></svg></button>
+            <button class="btn btn--ghost btn--sm zoombox__val" id="zoomVal" aria-label="Reset zoom to fit">100%</button>
+            <button class="btn btn--icon btn--sm" id="zoomIn" aria-label="Zoom in"><svg class="ico"><use href="#i-plus"/></svg></button>
+          </div>
+          <button class="btn btn--icon" id="themeBtn" aria-label="Toggle theme" title="Toggle theme (D)">
+            <svg class="ico ico-dark"><use href="#i-moon"/></svg><svg class="ico ico-light"><use href="#i-sun"/></svg>
+          </button>
+          <button class="btn btn--icon t-desk" id="kbdBtn" aria-label="Keyboard shortcuts" title="Shortcuts (?)"><svg class="ico"><use href="#i-kbd"/></svg></button>
+          <button class="btn btn--icon t-desk" id="resetBtn" aria-label="Reset all settings" title="Reset all"><svg class="ico"><use href="#i-reset"/></svg></button>
+          <button class="btn btn--primary" id="exportBtn" title="Export (E)">
+            <svg class="ico"><use href="#i-export"/></svg><span class="t-desk">Export</span>
+          </button>
+          <button class="btn btn--icon t-mob" id="moreBtn" popovertarget="morePop" aria-label="More actions"><svg class="ico"><use href="#i-more"/></svg></button>
+        </div>
+      </header>
+
+      <div class="workspace">
+
+        <nav class="rail" id="rail" aria-label="Settings categories"></nav>
+
+        <aside class="panel" id="panel" aria-label="Settings">
+          <div class="panel__head">
+            <h2 class="panel__title" id="panelTitle">Canvas</h2>
+            <button class="btn btn--icon btn--sm" id="panelCollapse" aria-label="Collapse panel" title="Collapse panel"><svg class="ico"><use href="#i-collapse"/></svg></button>
+          </div>
+          <div class="panel__body" id="panelBody"></div>
+          <div class="panel__foot">
+            <button class="btn btn--soft btn--block" id="randomBtn"><svg class="ico"><use href="#i-dice"/></svg>Randomize</button>
+          </div>
+          <div class="panel__resize" id="panelResize" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize settings panel"></div>
+        </aside>
+
+        <button class="panel-reopen" id="panelReopen" aria-label="Show settings panel"><svg class="ico"><use href="#i-sliders"/></svg></button>
+
+        <section class="stage" id="stage" aria-label="Canvas workspace">
+          <div class="stage__viewport" id="viewport">
+            <div class="artboard" id="artboard">
+              <canvas id="canvas" role="img" aria-label="Generated canvas preview"></canvas>
+            </div>
+          </div>
+          <div class="stage__hud">
+            <div class="pill" id="hudSize">1080 × 1080</div>
+            <button class="pill pill--btn" id="zoomFitMob" aria-label="Fit canvas to screen"><svg class="ico"><use href="#i-fit"/></svg><span id="zoomValMob">100%</span></button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ─────────── mobile bottom sheet ─────────── -->
+      <div class="sheet" id="sheet" data-snap="peek" aria-label="Settings">
+        <div class="sheet__grabber" id="sheetGrab" role="button" tabindex="0" aria-label="Expand settings" aria-expanded="false">
+          <span class="sheet__bar"></span>
+        </div>
+        <div class="sheet__head">
+          <div class="chips" id="chips" role="tablist" aria-label="Settings categories"></div>
+        </div>
+        <div class="sheet__body" id="sheetBody"></div>
+        <div class="sheet__foot">
+          <button class="btn btn--soft" id="randomBtnM" aria-label="Randomize"><svg class="ico"><use href="#i-dice"/></svg>Random</button>
+          <button class="btn btn--primary btn--grow" id="exportBtnM"><svg class="ico"><use href="#i-export"/></svg>Export</button>
+        </div>
+      </div>
+
+      <!-- single controls host, re-parented between panel and sheet -->
+      <div class="controls" id="controlsHost" hidden></div>
+
+      <div class="pop" id="presetPop" popover>
+        <div class="pop__title">Presets</div>
+        <div class="pop__list" id="presetList"></div>
+      </div>
+
+      <div class="pop" id="morePop" popover>
+        <button class="pop__item" data-act="reset"><svg class="ico"><use href="#i-reset"/></svg>Reset all</button>
+        <button class="pop__item" data-act="theme"><svg class="ico"><use href="#i-moon"/></svg>Toggle theme</button>
+        <button class="pop__item" data-act="fit"><svg class="ico"><use href="#i-fit"/></svg>Fit canvas</button>
+      </div>
+
+      <div class="pop pop--color" id="colorPop" popover>
+        <div class="pop__title" id="colorPopTitle">Color</div>
+        <div class="swatches" id="colorSwatches"></div>
+        <div class="pop__row">
+          <label class="colorpick">
+            <input type="color" id="colorNative" aria-label="Custom color">
+            <span class="colorpick__face"><span class="colorpick__dot" id="colorDot"></span>Custom</span>
+          </label>
+          <input class="hexin" id="colorHex" spellcheck="false" autocomplete="off" aria-label="Hex value" maxlength="7">
+        </div>
+      </div>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+
+<dialog class="modal" id="kbdModal">
+  <div class="modal__head"><h2>Keyboard shortcuts</h2>
+    <button class="btn btn--icon btn--sm" id="kbdClose" aria-label="Close"><svg class="ico"><use href="#i-close"/></svg></button>
+  </div>
+  <ul class="kbdlist" id="kbdList"></ul>
+</dialog>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

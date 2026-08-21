@@ -1,0 +1,409 @@
+/* ==========================================================================
+   layout.css — app shell, chrome and the desktop/mobile switch
+   The layout is driven by [data-layout] on .app (set in JS from a
+   ResizeObserver), never by a raw media query. That keeps one truth for
+   "are we mobile?" in CSS and JS, and makes the device preview real.
+   ========================================================================== */
+
+/* ---------------------------------------------------- device preview shell */
+
+.stagehand {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg-sunken);
+}
+.stagehand[data-preview="on"] {
+  padding-bottom: 28px;
+  background:
+    radial-gradient(60% 60% at 50% 0%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 70%),
+    var(--bg-sunken);
+}
+
+.devbar {
+  display: none;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-5);
+}
+.stagehand[data-preview="on"] .devbar { display: flex; }
+
+/* the toggle strip itself is always reachable on a desktop-sized window */
+@media (min-width: 1024px) and (pointer: fine) {
+  .devbar { display: flex; }
+}
+
+.devbar__group {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.devbar__btn {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-xs);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--text-3);
+}
+.devbar__btn:hover { color: var(--text); }
+.devbar__btn.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+
+.devbar__icon {
+  display: grid;
+  place-items: center;
+  width: 28px; height: 28px;
+  border-radius: var(--r-sm);
+  color: var(--text-3);
+}
+.devbar__icon:hover { background: var(--surface-hover); color: var(--text); }
+.stagehand[data-preview="off"] .devbar__icon { opacity: .35; pointer-events: none; }
+
+.devbar__size {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.device {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  background: var(--bg);
+  overflow: hidden;
+}
+.stagehand[data-preview="on"] .device {
+  /* 0 1 auto, not none: when the frame is taller than the window that is
+     left over after the devbar, flexbox shrinks it instead of overflowing
+     the page. `height: min(…, 100%)` cannot do this — the percentage
+     resolves against the container, not the remaining free space. */
+  flex: 0 1 auto;
+  min-height: 0;
+  align-self: center;
+  margin: auto 0;                       /* centre in the leftover space */
+  width: var(--dev-w);
+  height: var(--dev-h);
+  max-width: calc(100vw - 32px);
+  border: 1px solid var(--border-strong);
+  border-radius: 26px;
+  box-shadow: var(--shadow-3);
+  transition: width var(--dur-3) var(--ease-out), height var(--dur-3) var(--ease-out);
+}
+
+/* ------------------------------------------------------------- app shell */
+
+.app {
+  position: relative;
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  container-type: inline-size;
+  container-name: app;
+}
+
+/* ---- density overrides: the whole mobile ergonomics story in one block ---- */
+.app[data-layout="mobile"] {
+  --ctl-h: 44px;
+  --tap: 44px;
+  --thumb: 26px;
+  --track: 6px;
+  --row-gap: 18px;
+  --pad-x: 16px;
+  --label-fs: var(--fs-lg);
+  --topbar-h: 54px;
+}
+/* fine pointer but touch-capable hybrids still get a comfortable target */
+.app[data-touch="true"][data-layout="desktop"] { --tap: 36px; --thumb: 20px; }
+
+/* -------------------------------------------------------------- topbar */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  height: calc(var(--topbar-h) + var(--safe-t));
+  padding: var(--safe-t) calc(var(--s-4) + var(--safe-r)) 0 calc(var(--s-4) + var(--safe-l));
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  z-index: 30;
+}
+
+.topbar__lead { display: flex; align-items: center; gap: var(--s-3); min-width: 0; flex: 0 1 auto; }
+.topbar__mid { flex: 1 1 auto; display: flex; justify-content: center; min-width: 0; }
+.topbar__trail { display: flex; align-items: center; gap: var(--s-1); margin-left: auto; flex: none; }
+
+.brand {
+  width: 20px; height: 20px;
+  flex: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 45%, #14e3c2));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 40%, transparent) inset;
+}
+
+.topbar__title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-layout="mobile"] .topbar__title { font-size: var(--fs-lg); }
+
+.zoombox {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  margin-right: var(--s-2);
+  padding: 2px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.zoombox__val { min-width: 50px; font-variant-numeric: tabular-nums; color: var(--text-2); }
+
+/* ----------------------------------------------------------- workspace */
+
+.workspace {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--rail-w) var(--panel-w) minmax(0, 1fr);
+  min-height: 0;
+}
+.app[data-panel="collapsed"] .workspace { grid-template-columns: var(--rail-w) 0 minmax(0, 1fr); }
+.app[data-layout="mobile"] .workspace { grid-template-columns: minmax(0, 1fr); }
+
+/* ---------------------------------------------------------------- rail */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-3) var(--s-2);
+  padding-left: calc(var(--s-2) + var(--safe-l));
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.rail::-webkit-scrollbar { display: none; }
+[data-layout="mobile"] .rail { display: none; }
+
+.rail__btn {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: var(--s-2) 2px;
+  border-radius: var(--r-md);
+  color: var(--text-3);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.rail__btn .ico { width: 19px; height: 19px; }
+.rail__btn span {
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: .01em;
+  line-height: 1;
+}
+.rail__btn:hover { background: var(--surface-hover); color: var(--text-2); }
+.rail__btn.is-active { background: var(--accent-soft); color: var(--accent); }
+.rail__btn.is-active::before {
+  content: "";
+  position: absolute;
+  left: -8px; top: 50%;
+  width: 3px; height: 20px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+  transform: translateY(-50%);
+}
+.rail__btn[data-dirty="true"]::after {
+  content: "";
+  position: absolute;
+  top: 6px; right: 8px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* --------------------------------------------------------------- panel */
+
+.panel {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+  transition: opacity var(--dur-2) var(--ease);
+}
+.app[data-panel="collapsed"] .panel { opacity: 0; pointer-events: none; }
+[data-layout="mobile"] .panel { display: none; }
+
+.panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 var(--s-3) 0 var(--pad-x);
+  border-bottom: 1px solid var(--border-soft);
+}
+.panel__title { font-size: var(--fs-md); font-weight: 600; letter-spacing: -.01em; }
+
+.panel__body { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+.panel__foot {
+  padding: var(--s-3) var(--pad-x);
+  padding-bottom: calc(var(--s-3) + var(--safe-b));
+  border-top: 1px solid var(--border-soft);
+  background: var(--surface);
+}
+
+.panel__resize {
+  position: absolute;
+  top: 0; right: -3px;
+  width: 7px; height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+}
+.panel__resize::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity var(--dur-1) var(--ease);
+}
+.panel__resize:hover::after, .panel__resize.is-dragging::after { opacity: .7; }
+[data-layout="mobile"] .panel__resize { display: none; }
+
+.panel-reopen {
+  position: absolute;
+  left: var(--s-3);
+  top: var(--s-3);
+  z-index: 12;
+  display: none;
+  place-items: center;
+  width: 34px; height: 34px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  box-shadow: var(--shadow-2);
+}
+.app[data-panel="collapsed"][data-layout="desktop"] .panel-reopen { display: grid; }
+.panel-reopen:hover { color: var(--text); border-color: var(--border-strong); }
+
+/* --------------------------------------------------------------- stage */
+
+.stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in oklab, var(--surface) 55%, transparent), transparent 60%),
+    var(--bg);
+}
+/* subtle dotted workspace texture */
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+  background-size: 22px 22px;
+  opacity: .5;
+  pointer-events: none;
+}
+
+.stage__viewport {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--s-6);
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: none;          /* we own pinch + pan on the artboard */
+  scrollbar-width: thin;
+}
+[data-layout="mobile"] .stage__viewport {
+  padding: var(--s-4);
+  /* keep the artwork centred in the space the sheet leaves behind */
+  padding-bottom: calc(var(--sheet-peek) + var(--s-4) + var(--safe-b));
+}
+
+.artboard {
+  position: relative;
+  flex: none;
+  border-radius: 3px;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2), 0 0 0 1px var(--border);
+  transition: box-shadow var(--dur-2) var(--ease);
+  will-change: width, height;
+}
+.artboard.is-checker {
+  background-image:
+    conic-gradient(var(--checker-a) 90deg, var(--checker-b) 90deg 180deg,
+                   var(--checker-a) 180deg 270deg, var(--checker-b) 270deg);
+  background-size: 18px 18px;
+}
+.artboard canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.stage__hud {
+  position: absolute;
+  left: var(--s-4);
+  bottom: var(--s-4);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  pointer-events: none;
+}
+.stage__hud > * { pointer-events: auto; }
+[data-layout="mobile"] .stage__hud {
+  bottom: calc(var(--sheet-peek) + var(--s-3) + var(--safe-b));
+  left: calc(var(--s-3) + var(--safe-l));
+  transition: bottom var(--dur-2) var(--ease);
+}
+/* fade the HUD away while the sheet is expanded over it */
+[data-layout="mobile"] .app:has(.sheet[data-snap="full"]) .stage__hud { opacity: 0; }
+
+/* ------------------------------------------------- desktop, but narrow
+   "Desktop" is not one width. Between the mobile breakpoint and a roomy
+   window the toolbar sheds its optional controls in priority order rather
+   than overflowing — every dropped control still has a home elsewhere
+   (aspect lives in the Canvas panel, zoom on the HUD pill and ⌘+scroll). */
+
+@container app (max-width: 1060px) {
+  .zoombox { display: none; }
+}
+@container app (max-width: 900px) {
+  .topbar__mid { display: none; }
+}
+@container app (max-width: 880px) {
+  .topbar__title { display: none; }
+}
+
+/* --------------------------------------------------- container fallback */
+/* If JS never runs, still give phones a usable single-column shell. */
+@media (max-width: 720px) {
+  .app:not([data-layout]) .rail,
+  .app:not([data-layout]) .panel { display: none; }
+  .app:not([data-layout]) .workspace { grid-template-columns: minmax(0, 1fr); }
+}

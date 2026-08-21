@@ -1,0 +1,150 @@
+/* ==========================================================================
+   sheet.css — the mobile bottom sheet: 3 snap points, drag-to-resize,
+   scroll hand-off, and a category chip strip that stays visible at peek.
+   ========================================================================== */
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: none;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  height: var(--sheet-full, 88%);
+  padding-bottom: calc(var(--safe-b) + var(--kb, 0px));
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface) 94%, transparent);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  box-shadow: var(--shadow-sheet);
+  transform: translate3d(0, var(--sheet-y, 0px), 0);
+  will-change: transform;
+  touch-action: none;
+}
+[data-layout="mobile"] .sheet { display: grid; }
+
+.sheet.is-animating {
+  transition: transform var(--dur-3) var(--ease-out);
+}
+
+/* ------------------------------------------------------------- grabber */
+
+.sheet__grabber {
+  display: grid;
+  place-items: center;
+  height: 26px;
+  cursor: grab;
+  touch-action: none;
+}
+.sheet__grabber:active { cursor: grabbing; }
+.sheet__bar {
+  width: 40px;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--border-strong);
+  transition: width var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.sheet__grabber:hover .sheet__bar { background: var(--text-3); width: 52px; }
+
+/* --------------------------------------------------------------- head */
+
+.sheet__head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 0 var(--s-3);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.chips {
+  display: flex;
+  gap: var(--s-2);
+  padding: 2px var(--pad-x) var(--s-1);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;         /* horizontal only: never steals the drag */
+  overscroll-behavior-x: contain;
+}
+.chips::-webkit-scrollbar { display: none; }
+
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 38px;
+  padding: 0 var(--s-4);
+  flex: none;
+  scroll-snap-align: center;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease);
+}
+.chip .ico { width: 15px; height: 15px; }
+.chip[aria-selected="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.chip[data-dirty="true"]:not([aria-selected="true"])::after {
+  content: "";
+  position: absolute;
+  top: 7px; right: 9px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* --------------------------------------------------------------- body */
+
+.sheet__body {
+  min-width: 0;                /* grid items default to min-width:auto and
+                                  would otherwise be sized by their widest
+                                  child instead of by the sheet */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+/* at peek the body is inert: the chips are the whole affordance */
+.sheet[data-snap="peek"] .sheet__body { overflow: hidden; }
+
+/* --------------------------------------------------------------- foot */
+
+.sheet__foot {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--pad-x);
+  border-top: 1px solid var(--border-soft);
+  background: color-mix(in oklab, var(--surface) 90%, transparent);
+}
+.sheet__foot .btn { height: 46px; border-radius: var(--r-md); }
+.sheet[data-snap="peek"] .sheet__foot { display: none; }
+
+/* the peek state shows chips only, so the canvas keeps the screen */
+.sheet[data-snap="peek"] { pointer-events: auto; }
+
+/* dim the workspace slightly when the sheet takes over the screen */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  background: rgb(0 0 0 / .28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-3) var(--ease);
+}
+.app:has(.sheet[data-snap="full"]) .scrim { opacity: 1; pointer-events: auto; }

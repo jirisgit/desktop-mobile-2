@@ -1,0 +1,301 @@
+/* ==========================================================================
+   base.css — reset, primitives (buttons, pills, popovers, toast, modal)
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;   /* stop iOS bumping type on rotate */
+  text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font);
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg-sunken);
+  overscroll-behavior: none;         /* kill pull-to-refresh on the shell */
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3, p, ul, figure { margin: 0; }
+ul { padding: 0; list-style: none; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+:where(button) {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.ico {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Visibility helpers keyed off the resolved layout, not the media query,
+   so the on-page device preview shows the true mobile UI. */
+[data-layout="mobile"] .t-desk { display: none !important; }
+[data-layout="desktop"] .t-mob { display: none !important; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  height: var(--tap);
+  min-width: var(--tap);
+  padding: 0 var(--s-4);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  user-select: none;
+  transition: background var(--dur-1) var(--ease),
+              color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease),
+              transform var(--dur-1) var(--ease);
+}
+.btn:hover { background: var(--surface-hover); color: var(--text); }
+.btn:active { transform: scale(.97); }
+
+.btn--icon { padding: 0; width: var(--tap); }
+.btn--sm { height: 28px; min-width: 28px; padding: 0 var(--s-3); font-size: var(--fs-sm); }
+.btn--block { width: 100%; }
+.btn--grow { flex: 1; }
+
+.btn--ghost { background: transparent; }
+
+.btn--soft {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+.btn--soft:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 560;
+}
+.btn--primary:hover { background: var(--accent-hover); color: var(--accent-fg); }
+.btn--primary:active { background: var(--accent-press); }
+
+/* theme icon swap */
+[data-theme="dark"]  .ico-light { display: none; }
+[data-theme="light"] .ico-dark  { display: none; }
+
+/* ------------------------------------------------------------------ pills */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+  color: var(--text-2);
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-1);
+}
+.pill--btn { cursor: pointer; }
+.pill--btn:hover { color: var(--text); border-color: var(--border-strong); }
+.pill .ico { width: 13px; height: 13px; }
+
+/* -------------------------------------------------------------- popovers */
+
+.pop {
+  position: fixed;
+  margin: 0;
+  inset: auto;
+  min-width: 208px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: var(--s-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-3);
+  overflow: visible;
+}
+.pop:popover-open {
+  animation: pop-in var(--dur-2) var(--ease-out);
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(.98); }
+}
+.pop::backdrop { background: transparent; }
+
+.pop__title {
+  padding: var(--s-2) var(--s-3) var(--s-1);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.pop__list { display: grid; gap: 2px; }
+
+.pop__item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-md);
+  text-align: left;
+  color: var(--text-2);
+}
+.pop__item:hover { background: var(--surface-hover); color: var(--text); }
+.pop__item.is-active { background: var(--accent-soft); color: var(--text); }
+.pop__item .ico { color: var(--text-3); }
+.pop__item.is-active .ico { color: var(--accent); }
+.pop__item small { display: block; color: var(--text-3); font-size: var(--fs-xs); }
+
+.pop__row { display: flex; gap: var(--s-2); padding: var(--s-2); }
+
+/* On mobile every popover becomes a bottom-anchored sheet: thumb-reachable
+   and never clipped by the viewport edge. */
+[data-layout="mobile"] .pop {
+  left: var(--s-3) !important;
+  right: var(--s-3) !important;
+  bottom: calc(var(--s-3) + var(--safe-b)) !important;
+  top: auto !important;
+  width: auto;
+  max-width: none;
+  padding: var(--s-3);
+  border-radius: var(--r-xl);
+}
+[data-layout="mobile"] .pop:popover-open { animation: pop-up var(--dur-3) var(--ease-out); }
+@keyframes pop-up { from { opacity: 0; transform: translateY(14px); } }
+
+/* ------------------------------------------------------------------ toast */
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--s-6) + var(--safe-b));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-5);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text);
+  background: color-mix(in oklab, var(--surface) 92%, transparent);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-3);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  opacity: 0;
+  transform: translate(-50%, 10px);
+  pointer-events: none;
+  transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease-out);
+}
+.toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+[data-layout="mobile"] .toast { bottom: calc(var(--sheet-peek) + var(--s-4) + var(--safe-b)); }
+
+/* ------------------------------------------------------------------ modal */
+
+.modal {
+  width: min(480px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-3);
+}
+.modal::backdrop { background: rgb(0 0 0 / .5); backdrop-filter: blur(3px); }
+.modal[open] { animation: pop-in var(--dur-2) var(--ease-out); }
+
+.modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-5) var(--s-5) var(--s-3);
+}
+.modal__head h2 { font-size: var(--fs-lg); font-weight: 600; }
+
+.kbdlist { padding: 0 var(--s-5) var(--s-5); display: grid; gap: 2px; }
+.kbdlist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-md);
+  color: var(--text-2);
+}
+.kbdlist li:nth-child(odd) { background: var(--surface-2); }
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 2px 6px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--r-xs);
+  background: var(--surface-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  text-align: center;
+  color: var(--text);
+}
+
+/* ------------------------------------------------- reduced motion + print */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
