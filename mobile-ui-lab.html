@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>UI Lab — workspace + adaptive dock</title>
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  --bg:        #101216;   /* workspace / paper */
+  --panel:     #1a1d24;   /* dock & sidebar surface */
+  --raised:    #232833;   /* control surfaces */
+  --line:      #2e3440;   /* hairlines */
+  --ink:       #c9cfda;   /* primary text */
+  --dim:       #79839a;   /* secondary text */
+  --accent:    #f2a93b;   /* interaction: thumb, focus, active */
+  --accent-ink:#161006;
+
+  /* Lab-adjustable layout vars (mobile) */
+  --dockH: 42svh;         /* height of bottom dock */
+  --colW:  280px;         /* width of one category column */
+  --railH: 34px;          /* height of the grab rail */
+
+  --sidebarW: 320px;      /* desktop */
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+*{ box-sizing:border-box; margin:0; padding:0; }
+html,body{
+  height:100%;
+  overflow:hidden;
+  overscroll-behavior:none;
+  background:var(--panel);
+  color:var(--ink);
+  font:13px/1.45 var(--mono);
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+}
+button{ font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+
+/* ============================================================
+   APP FRAME — desktop first: workspace | sidebar
+   ============================================================ */
+#app{
+  height:100dvh;
+  display:grid;
+  grid-template-columns:1fr var(--sidebarW);
+  grid-template-rows:1fr;
+}
+
+/* ---------- workspace ---------- */
+#workspace{ position:relative; background:var(--bg); overflow:hidden; }
+#cv{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+
+#modeBadge{
+  position:absolute; top:10px; left:10px;
+  padding:5px 9px;
+  font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--dim);
+  background:color-mix(in srgb, var(--panel) 78%, transparent);
+  border:1px solid var(--line); border-radius:6px;
+  pointer-events:none;
+  backdrop-filter:blur(4px);
+}
+#modeBadge b{ color:var(--accent); font-weight:600; }
+
+/* ---------- panel (sidebar on desktop, dock on mobile) ---------- */
+#panel{
+  display:flex; flex-direction:column;
+  background:var(--panel);
+  border-left:1px solid var(--line);
+  min-height:0; min-width:0;
+}
+
+/* the grab rail — mobile only */
+#rail{ display:none; }
+
+/* ---------- scroller: holds category sections ---------- */
+#scroller{
+  position:relative;          /* offsetParent for category sections */
+  flex:1; min-height:0;
+  overflow-y:auto; overflow-x:hidden;
+  scrollbar-width:thin;
+  scrollbar-color:var(--raised) transparent;
+}
+#scroller::-webkit-scrollbar{ width:8px; height:8px; }
+#scroller::-webkit-scrollbar-thumb{ background:var(--raised); border-radius:4px; }
+
+/* ---------- category section ---------- */
+.cat{ border-bottom:1px solid var(--line); }
+.cat-head{
+  width:100%;
+  display:flex; align-items:center; gap:8px;
+  padding:11px 14px;
+  font-size:11px; font-weight:600;
+  letter-spacing:.16em; text-transform:uppercase;
+  color:var(--dim);
+  text-align:left;
+  user-select:none;
+}
+.cat-head .chev{ margin-left:auto; transition:transform .18s; font-size:10px; }
+.cat.collapsed .cat-head .chev{ transform:rotate(-90deg); }
+.cat-head:hover{ color:var(--ink); }
+.cat-body{ padding:2px 14px 16px; display:grid; gap:14px; }
+.cat.collapsed .cat-body{ display:none; }   /* accordion — desktop */
+
+.note{ color:var(--dim); font-size:11px; line-height:1.6; }
+
+/* ============================================================
+   CONTROLS
+   ============================================================ */
+
+/* --- slider --- */
+.ctl-slider{ display:grid; grid-template-columns:1fr auto; gap:4px 8px; }
+.ctl-name{ font-size:11px; letter-spacing:.06em; color:var(--ink); }
+.ctl-val { font-size:11px; color:var(--accent); font-variant-numeric:tabular-nums; }
+.ctl-slider input[type=range]{
+  grid-column:1 / -1;
+  -webkit-appearance:none; appearance:none;
+  width:100%; height:32px;               /* generous touch target */
+  background:transparent;
+  touch-action:pan-y;                    /* vertical swipe on a slider scrolls the column
+                                            instead of yanking the value — horizontal
+                                            gestures still drive the slider */
+}
+.ctl-slider input[type=range]::-webkit-slider-runnable-track{
+  height:4px; border-radius:2px; background:var(--raised);
+}
+.ctl-slider input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:26px; height:26px; margin-top:-11px;
+  border-radius:50%;
+  background:var(--ink);
+  border:4px solid var(--panel);
+  box-shadow:0 0 0 1px var(--line);
+}
+.ctl-slider input[type=range]:active::-webkit-slider-thumb{ background:var(--accent); }
+.ctl-slider input[type=range]::-moz-range-track{
+  height:4px; border-radius:2px; background:var(--raised);
+}
+.ctl-slider input[type=range]::-moz-range-thumb{
+  width:18px; height:18px; border-radius:50%;
+  background:var(--ink); border:4px solid var(--panel);
+  box-shadow:0 0 0 1px var(--line);
+}
+.ctl-slider input[type=range]:active::-moz-range-thumb{ background:var(--accent); }
+
+/* --- toggle --- */
+.ctl-toggle{
+  display:flex; align-items:center; gap:10px;
+  min-height:44px; padding:0 12px;
+  background:var(--raised);
+  border:1px solid var(--line); border-radius:8px;
+  text-align:left;
+}
+.ctl-toggle .led{
+  width:8px; height:8px; border-radius:50%;
+  background:var(--line); flex:none;
+  transition:background .15s, box-shadow .15s;
+}
+.ctl-toggle[aria-pressed=true] .led{
+  background:var(--accent);
+  box-shadow:0 0 8px var(--accent);
+}
+.ctl-toggle .state{ margin-left:auto; font-size:10px; letter-spacing:.1em; color:var(--dim); }
+.ctl-toggle[aria-pressed=true] .state{ color:var(--accent); }
+
+/* --- action button --- */
+.ctl-action{
+  min-height:44px; padding:0 12px;
+  background:var(--raised);
+  border:1px solid var(--line); border-radius:8px;
+  letter-spacing:.06em;
+}
+.ctl-action:active{ background:var(--line); }
+
+/* --- color picker --- */
+.ctl-color{
+  display:flex; align-items:center; gap:10px;
+  min-height:44px; padding:0 12px;
+  background:var(--raised);
+  border:1px solid var(--line); border-radius:8px;
+  position:relative;
+}
+.ctl-color .swatch{
+  width:26px; height:26px; border-radius:6px; flex:none;
+  border:1px solid rgba(255,255,255,.15);
+}
+.ctl-color .hex{ margin-left:auto; color:var(--dim); font-size:11px; }
+.ctl-color input[type=color]{
+  position:absolute; inset:0; width:100%; height:100%;
+  opacity:0; cursor:pointer;
+}
+
+/* --- segmented --- */
+.ctl-seg{ display:flex; gap:0; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+.ctl-seg button{
+  flex:1; min-height:40px;
+  background:var(--raised);
+  border-right:1px solid var(--line);
+  font-size:11px; letter-spacing:.08em; color:var(--dim);
+}
+.ctl-seg button:last-child{ border-right:0; }
+.ctl-seg button[aria-pressed=true]{ background:var(--accent); color:var(--accent-ink); font-weight:600; }
+.seg-label{ font-size:11px; letter-spacing:.06em; margin-bottom:6px; display:block; }
+
+/* ============================================================
+   MOBILE MODE — dock at the bottom, horizontal columns, grab rail
+   ============================================================ */
+@media (max-aspect-ratio: 1/1), (max-width: 640px){
+  #app{
+    grid-template-columns:1fr;
+    grid-template-rows:1fr var(--dockH);
+  }
+  #panel{
+    border-left:0;
+    border-top:1px solid var(--line);
+  }
+
+  /* ---- the grab rail ---------------------------------------
+     A thick scrubber. It is the ONLY thing that pans the dock
+     horizontally (unless the "direct swipe" experiment is on),
+     so a finger can never change a slider by accident while
+     navigating. It doubles as a category index: etched tick
+     labels sit at each category's scroll position; tap or drag
+     anywhere to scrub. --------------------------------------- */
+  #rail{
+    display:block; position:relative; flex:none;
+    height:var(--railH);
+    background:var(--bg);
+    border-bottom:1px solid var(--line);
+    touch-action:none;          /* we own every gesture here */
+    user-select:none;
+    cursor:grab;
+  }
+  #rail:active{ cursor:grabbing; }
+  .tick{
+    position:absolute; top:50%; transform:translate(-50%,-50%);
+    font-size:9px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--dim);
+    pointer-events:none;
+    transition:color .15s;
+  }
+  .tick.active{ color:var(--accent); }
+  #thumb{
+    position:absolute; top:4px; bottom:4px; left:0;
+    border-radius:99px;
+    background:color-mix(in srgb, var(--accent) 16%, transparent);
+    border:1px solid var(--accent);
+    pointer-events:none;
+    transition:background .12s;
+  }
+  #rail.scrubbing #thumb{
+    background:color-mix(in srgb, var(--accent) 34%, transparent);
+    box-shadow:0 0 14px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
+  /* ---- horizontal column scroller ---- */
+  #scroller{
+    display:flex;
+    overflow-x:auto; overflow-y:hidden;
+    touch-action:pan-y;         /* touch cannot pan horizontally — rail only */
+    scrollbar-width:none;
+  }
+  #scroller::-webkit-scrollbar{ display:none; }
+  #panel.snap #scroller{ scroll-snap-type:x proximity; }
+  #panel.direct-swipe #scroller{ touch-action:pan-x pan-y; } /* experiment flag */
+
+  .cat{
+    flex:none; width:var(--colW);
+    display:flex; flex-direction:column;
+    border-bottom:0; border-right:1px solid var(--line);
+    scroll-snap-align:start;
+    min-height:0;
+  }
+  .cat-head{ flex:none; padding:10px 14px 6px; pointer-events:none; }
+  .cat-head .chev{ display:none; }
+  .cat.collapsed .cat-body{ display:grid; }   /* collapse is desktop-only */
+  .cat-body{
+    flex:1; min-height:0;
+    overflow-y:auto;                          /* tall categories scroll vertically */
+    padding-bottom:max(16px, env(safe-area-inset-bottom));
+    align-content:start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ transition:none !important; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="workspace">
+    <canvas id="cv"></canvas>
+    <div id="modeBadge"></div>
+  </div>
+
+  <div id="panel">
+    <div id="rail" aria-hidden="true">
+      <div id="thumb"></div>
+    </div>
+    <div id="scroller"><!-- categories injected here --></div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+/* ==============================================================
+   UI LAB
+   One DOM, two layouts. The panel content below is rendered once
+   from a schema; CSS alone turns it into a vertical sidebar
+   (desktop) or a horizontal bottom dock with a grab rail (mobile).
+   ============================================================== */
+
+/* ---------- live parameters driving the demo canvas ---------- */
+const P = {
+  scale:1.0, rot:0, offX:0, offY:0,
+  ink:'#59d6e6', paper:'#101216', stroke:1.6, alpha:0.9,
+  playing:true, speed:1.0, freqA:3, freqB:5, chaos:0.25,
+  trails:true, grid:false, points:900,
+};
+
+/* ---------- lab flags / layout vars ---------- */
+const LAB = { snap:true, directSwipe:false, dockH:42, colW:280, railH:34 };
+
+const $  = s => document.querySelector(s);
+const panel    = $('#panel');
+const scroller = $('#scroller');
+const rail     = $('#rail');
+const thumb    = $('#thumb');
+const root     = document.documentElement;
+
+/* ==============================================================
+   CONTROL SCHEMA → DOM
+   types: slider | color | toggle | action | seg | note
+   ============================================================== */
+const fmt = {
+  num1:v=>(+v).toFixed(1), num2:v=>(+v).toFixed(2),
+  int:v=>String(Math.round(v)),
+  deg:v=>Math.round(v)+'°', px:v=>Math.round(v)+'px',
+  pct:v=>Math.round(v*100)+'%', vh:v=>Math.round(v)+'svh',
+};
+
+const CATS = [
+  { id:'lab', name:'Lab', controls:[
+    { t:'note', text:'Meta-controls for the system itself. Rotate the device or resize the window to switch layouts.' },
+    { t:'toggle', name:'Snap to category', get:()=>LAB.snap, set:v=>{ LAB.snap=v; panel.classList.toggle('snap',v); } },
+    { t:'toggle', name:'Direct swipe (danger)', get:()=>LAB.directSwipe, set:v=>{ LAB.directSwipe=v; panel.classList.toggle('direct-swipe',v); } },
+    { t:'slider', name:'Dock height', min:28, max:64, step:1, f:fmt.vh,
+      get:()=>LAB.dockH, set:v=>{ LAB.dockH=v; root.style.setProperty('--dockH', v+'svh'); } },
+    { t:'slider', name:'Column width', min:220, max:380, step:2, f:fmt.px,
+      get:()=>LAB.colW, set:v=>{ LAB.colW=v; root.style.setProperty('--colW', v+'px'); } },
+    { t:'slider', name:'Rail height', min:22, max:60, step:1, f:fmt.px,
+      get:()=>LAB.railH, set:v=>{ LAB.railH=v; root.style.setProperty('--railH', v+'px'); } },
+  ]},
+  { id:'view', name:'View', controls:[
+    { t:'slider', name:'Scale',    min:0.2, max:2.2, step:0.01, f:fmt.num2, get:()=>P.scale, set:v=>P.scale=v },
+    { t:'slider', name:'Rotation', min:0,   max:360, step:1,    f:fmt.deg,  get:()=>P.rot,   set:v=>P.rot=v },
+    { t:'slider', name:'Offset X', min:-1,  max:1,   step:0.01, f:fmt.num2, get:()=>P.offX,  set:v=>P.offX=v },
+    { t:'slider', name:'Offset Y', min:-1,  max:1,   step:0.01, f:fmt.num2, get:()=>P.offY,  set:v=>P.offY=v },
+  ]},
+  { id:'color', name:'Color', controls:[
+    { t:'color',  name:'Ink',   get:()=>P.ink,   set:v=>P.ink=v },
+    { t:'color',  name:'Paper', get:()=>P.paper, set:v=>P.paper=v },
+    { t:'slider', name:'Stroke',  min:0.5, max:6, step:0.1,  f:fmt.num1, get:()=>P.stroke, set:v=>P.stroke=v },
+    { t:'slider', name:'Opacity', min:0.05, max:1, step:0.01, f:fmt.pct,  get:()=>P.alpha,  set:v=>P.alpha=v },
+  ]},
+  { id:'motion', name:'Motion', controls:[
+    { t:'toggle', name:'Play', get:()=>P.playing, set:v=>P.playing=v },
+    { t:'slider', name:'Speed',   min:0, max:3, step:0.05, f:fmt.num2, get:()=>P.speed, set:v=>P.speed=v },
+    { t:'slider', name:'Freq A',  min:1, max:9, step:1,    f:fmt.int,  get:()=>P.freqA, set:v=>P.freqA=v },
+    { t:'slider', name:'Freq B',  min:1, max:9, step:1,    f:fmt.int,  get:()=>P.freqB, set:v=>P.freqB=v },
+    { t:'slider', name:'Chaos',   min:0, max:1, step:0.01, f:fmt.pct,  get:()=>P.chaos, set:v=>P.chaos=v },
+    { t:'action', name:'Randomize', run:randomize },
+  ]},
+  { id:'render', name:'Render', controls:[
+    { t:'toggle', name:'Trails', get:()=>P.trails, set:v=>P.trails=v },
+    { t:'toggle', name:'Grid',   get:()=>P.grid,   set:v=>P.grid=v },
+    { t:'seg', name:'Quality', options:[['Low',300],['Med',900],['High',2400]],
+      get:()=>P.points, set:v=>P.points=v },
+  ]},
+];
+
+const refreshers = [];   // per-control UI refresh fns (for randomize etc.)
+
+function buildControl(c){
+  if (c.t==='note'){
+    const d=document.createElement('div'); d.className='note'; d.textContent=c.text; return d;
+  }
+  if (c.t==='slider'){
+    const w=document.createElement('label'); w.className='ctl-slider';
+    w.innerHTML=`<span class="ctl-name"></span><span class="ctl-val"></span>
+                 <input type="range">`;
+    w.querySelector('.ctl-name').textContent=c.name;
+    const val=w.querySelector('.ctl-val'), inp=w.querySelector('input');
+    inp.min=c.min; inp.max=c.max; inp.step=c.step;
+    const refresh=()=>{ inp.value=c.get(); val.textContent=c.f(c.get()); };
+    inp.addEventListener('input',()=>{ c.set(+inp.value); val.textContent=c.f(+inp.value); layoutRail(); });
+    refresh(); refreshers.push(refresh);
+    return w;
+  }
+  if (c.t==='toggle'){
+    const b=document.createElement('button'); b.className='ctl-toggle'; b.type='button';
+    b.innerHTML=`<span class="led"></span><span></span><span class="state"></span>`;
+    b.children[1].textContent=c.name;
+    const refresh=()=>{ const on=c.get(); b.setAttribute('aria-pressed',on);
+                        b.querySelector('.state').textContent=on?'ON':'OFF'; };
+    b.addEventListener('click',()=>{ c.set(!c.get()); refresh(); });
+    refresh(); refreshers.push(refresh);
+    return b;
+  }
+  if (c.t==='action'){
+    const b=document.createElement('button'); b.className='ctl-action'; b.type='button';
+    b.textContent=c.name;
+    b.addEventListener('click',()=>{ c.run(); refreshers.forEach(f=>f()); });
+    return b;
+  }
+  if (c.t==='color'){
+    const w=document.createElement('label'); w.className='ctl-color';
+    w.innerHTML=`<span class="swatch"></span><span></span><span class="hex"></span>
+                 <input type="color">`;
+    w.children[1].textContent=c.name;
+    const sw=w.querySelector('.swatch'), hex=w.querySelector('.hex'), inp=w.querySelector('input');
+    const refresh=()=>{ inp.value=c.get(); sw.style.background=c.get(); hex.textContent=c.get(); };
+    inp.addEventListener('input',()=>{ c.set(inp.value); refresh(); });
+    refresh(); refreshers.push(refresh);
+    return w;
+  }
+  if (c.t==='seg'){
+    const w=document.createElement('div');
+    w.innerHTML=`<span class="seg-label"></span><div class="ctl-seg"></div>`;
+    w.querySelector('.seg-label').textContent=c.name;
+    const row=w.querySelector('.ctl-seg');
+    const refresh=()=>{ [...row.children].forEach(b=>b.setAttribute('aria-pressed', +b.dataset.v===c.get())); };
+    for(const [label,v] of c.options){
+      const b=document.createElement('button'); b.type='button';
+      b.textContent=label; b.dataset.v=v;
+      b.addEventListener('click',()=>{ c.set(v); refresh(); });
+      row.appendChild(b);
+    }
+    refresh(); refreshers.push(refresh);
+    return w;
+  }
+}
+
+for(const cat of CATS){
+  const sec=document.createElement('section');
+  sec.className='cat'; sec.dataset.id=cat.id;
+  const head=document.createElement('button');
+  head.className='cat-head'; head.type='button';
+  head.innerHTML=`<span></span><span class="chev">▾</span>`;
+  head.firstChild.textContent=cat.name;
+  head.addEventListener('click',()=>sec.classList.toggle('collapsed')); // desktop accordion
+  const body=document.createElement('div'); body.className='cat-body';
+  for(const c of cat.controls) body.appendChild(buildControl(c));
+  sec.append(head, body);
+  scroller.appendChild(sec);
+}
+panel.classList.toggle('snap', LAB.snap);
+
+function randomize(){
+  P.freqA=1+Math.floor(Math.random()*9);
+  P.freqB=1+Math.floor(Math.random()*9);
+  P.chaos=Math.random()*0.7;
+  P.rot=Math.random()*360;
+  P.ink='#'+[0,0,0].map(()=>Math.floor(96+Math.random()*160).toString(16).padStart(2,'0')).join('');
+}
+
+/* ==============================================================
+   MODE DETECTION
+   ============================================================== */
+const mq = matchMedia('(max-aspect-ratio: 1/1), (max-width: 640px)');
+const badge = $('#modeBadge');
+function applyMode(){
+  const mobile = mq.matches;
+  badge.innerHTML = mobile
+    ? 'mode <b>mobile</b> · dock + rail'
+    : 'mode <b>desktop</b> · sidebar';
+  if (mobile) requestAnimationFrame(layoutRail);
+}
+mq.addEventListener('change', applyMode);
+applyMode();
+
+/* ==============================================================
+   GRAB RAIL
+   A proportional scrubber. Mapping is the same as a native
+   scrollbar: thumbWidth = rail * visible/total, and pointer x
+   (minus half the thumb) maps linearly onto scrollLeft. Tick
+   labels are placed where the thumb's CENTER sits when that
+   category is docked at the left edge — so tapping a label
+   lands exactly on its category.
+   ============================================================== */
+let thumbW = 44, ticks = [];
+
+function layoutRail(){
+  if (!mq.matches) return;
+  const railW = rail.clientWidth;
+  const total = scroller.scrollWidth, vis = scroller.clientWidth;
+  const maxScroll = Math.max(1, total - vis);
+
+  thumbW = Math.max(44, railW * vis / total);
+  thumb.style.width = thumbW + 'px';
+
+  // (re)build ticks
+  if (ticks.length !== CATS.length){
+    ticks.forEach(t=>t.remove()); ticks=[];
+    for(const cat of CATS){
+      const t=document.createElement('span');
+      t.className='tick'; t.textContent=cat.name;
+      rail.appendChild(t); ticks.push(t);
+    }
+  }
+  const secs=[...scroller.children];
+  secs.forEach((sec,i)=>{
+    const left=Math.min(sec.offsetLeft, maxScroll);
+    const x = thumbW/2 + (left/maxScroll) * (railW - thumbW);
+    ticks[i].style.left = x + 'px';
+  });
+  syncThumb();
+}
+
+let activeCat = -1;
+function syncThumb(){
+  const railW = rail.clientWidth;
+  const maxScroll = Math.max(1, scroller.scrollWidth - scroller.clientWidth);
+  const x = (scroller.scrollLeft / maxScroll) * (railW - thumbW);
+  thumb.style.transform = `translateX(${x}px)`;
+
+  // highlight the category currently nearest the left edge
+  const secs=[...scroller.children];
+  let best=0, bestD=1e9;
+  secs.forEach((sec,i)=>{
+    const d=Math.abs(sec.offsetLeft - scroller.scrollLeft);
+    if (d<bestD){ bestD=d; best=i; }
+  });
+  if (best!==activeCat){
+    activeCat=best;
+    ticks.forEach((t,i)=>t.classList.toggle('active', i===best));
+    if (navigator.vibrate) navigator.vibrate(4);   // tiny detent tick
+  }
+}
+scroller.addEventListener('scroll', ()=>requestAnimationFrame(syncThumb), {passive:true});
+
+/* scrub: pointer down anywhere on the rail jumps the thumb there,
+   then dragging follows the finger 1:1 in rail space */
+rail.addEventListener('pointerdown', e=>{
+  rail.setPointerCapture(e.pointerId);
+  rail.classList.add('scrubbing');
+  scrub(e);
+});
+rail.addEventListener('pointermove', e=>{
+  if (rail.classList.contains('scrubbing')) scrub(e);
+});
+const endScrub = ()=>rail.classList.remove('scrubbing');
+rail.addEventListener('pointerup', endScrub);
+rail.addEventListener('pointercancel', endScrub);
+
+function scrub(e){
+  const r = rail.getBoundingClientRect();
+  const railW = r.width;
+  const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+  const t = (e.clientX - r.left - thumbW/2) / Math.max(1, railW - thumbW);
+  scroller.scrollLeft = Math.min(1, Math.max(0, t)) * maxScroll;
+}
+
+new ResizeObserver(()=>layoutRail()).observe(panel);
+addEventListener('resize', layoutRail);
+
+/* ==============================================================
+   DEMO WORKSPACE — a harmonograph-ish curve bound to the params,
+   so every control has a visible, immediate effect.
+   ============================================================== */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+let W=0, H=0, DPR=1, time=0, last=performance.now();
+
+new ResizeObserver(entries=>{
+  const box = entries[0].contentRect;
+  DPR = Math.min(2, devicePixelRatio||1);
+  W = Math.round(box.width*DPR); H = Math.round(box.height*DPR);
+  cv.width=W; cv.height=H;
+}).observe($('#workspace'));
+
+if (matchMedia('(prefers-reduced-motion: reduce)').matches) P.playing=false;
+
+function hexA(hex, a){
+  const n=parseInt(hex.slice(1),16);
+  return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;
+}
+
+function frame(now){
+  const dt = Math.min(0.05, (now-last)/1000); last=now;
+  if (P.playing) time += dt*P.speed;
+
+  if (!W){ requestAnimationFrame(frame); return; }
+
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle = P.trails ? hexA(P.paper, 0.09) : P.paper;
+  ctx.fillRect(0,0,W,H);
+
+  if (P.grid){
+    ctx.strokeStyle='rgba(128,140,160,0.10)'; ctx.lineWidth=1;
+    const step=44*DPR;
+    ctx.beginPath();
+    for(let x=(W/2)%step; x<W; x+=step){ ctx.moveTo(x,0); ctx.lineTo(x,H); }
+    for(let y=(H/2)%step; y<H; y+=step){ ctx.moveTo(0,y); ctx.lineTo(W,y); }
+    ctx.stroke();
+  }
+
+  const R = Math.min(W,H)*0.36*P.scale;
+  ctx.setTransform(1,0,0,1, W/2 + P.offX*W/2, H/2 + P.offY*H/2);
+  ctx.rotate(P.rot*Math.PI/180);
+
+  ctx.strokeStyle = hexA(P.ink, P.alpha);
+  ctx.lineWidth = P.stroke*DPR;
+  ctx.lineJoin='round';
+  ctx.beginPath();
+  const N=P.points;
+  for(let i=0;i<=N;i++){
+    const th = i/N * Math.PI*2;
+    const wob = 1 + P.chaos*0.5*Math.sin(th*13 + time*2.7);
+    const x = Math.sin(P.freqA*th + time)      * R * wob;
+    const y = Math.sin(P.freqB*th + time*0.62) * R * wob;
+    i ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+  }
+  ctx.stroke();
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* initial rail layout once fonts/layout settle */
+requestAnimationFrame(layoutRail);
+</script>
+</body>
+</html>
