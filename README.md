@@ -163,6 +163,7 @@ js/
   render.js         pure canvas drawing (live preview and export share it)
   viewport.js       artboard sizing, zoom, pinch, pan
   sheet.js          bottom-sheet snap points and gestures
+  popover.js        popover placement for both layouts
   app.js            wiring: layout decision, render loop, chrome
 ```
 

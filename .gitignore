@@ -4,3 +4,10 @@ node_modules/
 Thumbs.db
 *.log
 .env*
+
+# local exports produced by the app
+*.png
+*.jpg
+*.jpeg
+*.webp
+!favicon.svg

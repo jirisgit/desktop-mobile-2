@@ -9,6 +9,7 @@ import { buildControls, syncColorPop, h, icon } from './controls.js';
 import { draw, renderExport } from './render.js';
 import { createSheet } from './sheet.js';
 import { createViewport } from './viewport.js';
+import { placePopover, parkPopover } from './popover.js';
 
 const $ = id => document.getElementById(id);
 
@@ -173,6 +174,13 @@ function resolveLayout() {
   layout = next;
   el.app.dataset.layout = next;
 
+  /* An anchored popover cannot survive the layout flipping under it: its
+     trigger may have just been hidden, and desktop coordinates are wrong
+     for the mobile treatment. Dismiss rather than try to re-anchor. */
+  for (const p of document.querySelectorAll('[popover]')) {
+    if (p.matches(':popover-open')) p.hidePopover();
+  }
+
   /* one controls tree, two homes */
   (next === 'mobile' ? el.sheetBody : el.panelBody).append(el.host);
 
@@ -321,17 +329,14 @@ el.morePop.addEventListener('click', e => {
    compute coordinates for the desktop layout. */
 
 function anchorPop(pop, btn, align = 'left') {
+  /* `toggle` is queued, so it lands a frame after the popover is painted.
+     Park it off-screen in `beforetoggle` so that frame is never visible at
+     the wrong coordinates. */
+  pop.addEventListener('beforetoggle', e => {
+    if (e.newState === 'open') parkPopover(pop);
+  });
   pop.addEventListener('toggle', e => {
-    if (e.newState !== 'open') return;
-    if (el.app.dataset.layout === 'mobile') { pop.style.cssText = ''; return; }
-    const r = btn.getBoundingClientRect();
-    const pw = pop.offsetWidth, ph = pop.offsetHeight;
-    let left = align === 'right' ? r.right - pw : r.left;
-    left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
-    let top = r.bottom + 6;
-    if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
-    pop.style.left = left + 'px';
-    pop.style.top = top + 'px';
+    if (e.newState === 'open') placePopover(pop, btn, align);
   });
 }
 anchorPop(el.presetPop, $('presetBtn'), 'left');

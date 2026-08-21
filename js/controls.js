@@ -6,6 +6,7 @@
 
 import { CATEGORIES, PALETTE } from './schema.js';
 import { state, set } from './store.js';
+import { placePopover } from './popover.js';
 
 /* ------------------------------------------------------------- helpers */
 
@@ -378,23 +379,10 @@ function openColorPop(anchor, f) {
   colorTitle.textContent = f.label;
   refreshColorPop();
 
-  /* mobile: CSS pins it to the bottom edge, so drop any desktop coordinates */
-  const app = document.getElementById('app');
-  if (app.dataset.layout === 'mobile') colorPop.style.cssText = '';
-
   colorPop.hidePopover?.();
   colorPop.showPopover?.();
-  if (app.dataset.layout === 'mobile') return;
-
-  /* desktop: anchor under the trigger, clamped to the viewport */
-  const r = anchor.getBoundingClientRect();
-  const pw = colorPop.offsetWidth, ph = colorPop.offsetHeight;
-  let left = Math.min(r.left, window.innerWidth - pw - 8);
-  let top = r.bottom + 6;
-  if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
-  colorPop.style.left = Math.max(8, left) + 'px';
-  colorPop.style.top = top + 'px';
-  colorPop.style.width = Math.max(232, r.width) + 'px';
+  /* same task as showPopover(), so this never paints unpositioned */
+  placePopover(colorPop, anchor, 'match');
 }
 
 export function syncColorPop() { if (colorPop?.matches?.(':popover-open')) refreshColorPop(); }

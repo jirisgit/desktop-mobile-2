@@ -205,7 +205,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   right: var(--s-3) !important;
   bottom: calc(var(--s-3) + var(--safe-b)) !important;
   top: auto !important;
-  width: auto;
+  width: auto !important;    /* never inherit a stale desktop width */
   max-width: none;
   padding: var(--s-3);
   border-radius: var(--r-xl);
